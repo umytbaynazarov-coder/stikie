@@ -41,63 +41,123 @@ export default function ContextMenu() {
     setAdjusted(null)
   }, [])
 
+  // Resolve a DOM element + screen coords into a MenuTarget (or null if not applicable)
+  const resolveTarget = useCallback((el: HTMLElement, clientX: number, clientY: number): MenuTarget | null => {
+    const noteEl = el.closest('[data-note-id]')
+    if (noteEl) {
+      return { type: 'note', noteId: noteEl.getAttribute('data-note-id')! }
+    }
+    const canvasEl = el.closest('[data-canvas]')
+    if (canvasEl) {
+      const { canvasX, canvasY, zoom } = useNoteStore.getState()
+      const rect = canvasEl.getBoundingClientRect()
+      const cx = (clientX - rect.left - canvasX) / zoom
+      const cy = (clientY - rect.top - canvasY) / zoom
+      return { type: 'canvas', canvasX: cx, canvasY: cy }
+    }
+    return null
+  }, [])
+
+  const openMenuAt = useCallback((clientX: number, clientY: number, target: MenuTarget) => {
+    setMenu({ visible: true, x: clientX, y: clientY, target })
+    setSubmenu(null)
+    setFocusedIndex(-1)
+    setAdjusted(null)
+  }, [])
+
   // Global contextmenu listener
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-
-      // Check if right-clicked on a sticky note
-      const noteEl = target.closest('[data-note-id]')
-      if (noteEl) {
+      const target = resolveTarget(e.target as HTMLElement, e.clientX, e.clientY)
+      if (target) {
         e.preventDefault()
-        const noteId = noteEl.getAttribute('data-note-id')!
-        setMenu({ visible: true, x: e.clientX, y: e.clientY, target: { type: 'note', noteId } })
-        setSubmenu(null)
-        setFocusedIndex(-1)
-        setAdjusted(null)
-        return
+        openMenuAt(e.clientX, e.clientY, target)
       }
-
-      // Check if right-clicked on canvas
-      const canvasEl = target.closest('[data-canvas]')
-      if (canvasEl) {
-        e.preventDefault()
-        const { canvasX, canvasY, zoom } = useNoteStore.getState()
-        const rect = canvasEl.getBoundingClientRect()
-        const cx = (e.clientX - rect.left - canvasX) / zoom
-        const cy = (e.clientY - rect.top - canvasY) / zoom
-        setMenu({ visible: true, x: e.clientX, y: e.clientY, target: { type: 'canvas', canvasX: cx, canvasY: cy } })
-        setSubmenu(null)
-        setFocusedIndex(-1)
-        setAdjusted(null)
-        return
-      }
-
-      // Allow browser default for other areas
     }
 
     window.addEventListener('contextmenu', handleContextMenu)
     return () => window.removeEventListener('contextmenu', handleContextMenu)
-  }, [])
+  }, [resolveTarget, openMenuAt])
+
+  // Mobile long-press (500ms hold) to open context menu
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStart = useRef<{ x: number; y: number; target: HTMLElement } | null>(null)
+  const longPressFired = useRef(false)
+
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+      const touch = e.touches[0]
+      const el = e.target as HTMLElement
+      touchStart.current = { x: touch.clientX, y: touch.clientY, target: el }
+      longPressFired.current = false
+
+      longPressTimer.current = setTimeout(() => {
+        const resolved = resolveTarget(el, touch.clientX, touch.clientY)
+        if (resolved) {
+          longPressFired.current = true
+          openMenuAt(touch.clientX, touch.clientY, resolved)
+        }
+      }, 500)
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!touchStart.current || !longPressTimer.current) return
+      const touch = e.touches[0]
+      const dx = touch.clientX - touchStart.current.x
+      const dy = touch.clientY - touchStart.current.y
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+    }
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current)
+        longPressTimer.current = null
+      }
+      // Prevent the click/tap that follows a long-press from firing
+      if (longPressFired.current) {
+        e.preventDefault()
+        longPressFired.current = false
+      }
+    }
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true })
+    window.addEventListener('touchmove', handleTouchMove, { passive: true })
+    window.addEventListener('touchend', handleTouchEnd, { passive: false })
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+      if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    }
+  }, [resolveTarget, openMenuAt])
 
   // Close on click outside, scroll, resize
   useEffect(() => {
     if (!menu.visible) return
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = 'touches' in e ? e.touches[0] : e
+      const el = (e.target || target) as Node
+      if (menuRef.current && !menuRef.current.contains(el)) {
         closeMenu()
       }
     }
     const handleScroll = () => closeMenu()
     const handleResize = () => closeMenu()
 
-    window.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mousedown', handlePointerDown)
+    window.addEventListener('touchstart', handlePointerDown as EventListener)
     window.addEventListener('scroll', handleScroll, true)
     window.addEventListener('resize', handleResize)
 
     return () => {
-      window.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mousedown', handlePointerDown)
+      window.removeEventListener('touchstart', handlePointerDown as EventListener)
       window.removeEventListener('scroll', handleScroll, true)
       window.removeEventListener('resize', handleResize)
     }
