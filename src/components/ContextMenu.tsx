@@ -292,7 +292,7 @@ export default function ContextMenu() {
             position: 'fixed',
             left: posX,
             top: posY,
-            zIndex: 70,
+            zIndex: 9999,
             fontFamily: "'DM Sans', sans-serif",
             background: menuBg,
             backdropFilter: 'blur(12px)',
