@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* Self-hosted fonts — eliminates render-blocking Google Fonts request */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/fonts/caveat-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('/fonts/dm-sans-latin.woff2') format('woff2');
+}
+
+@theme {
+  --font-caveat: 'Caveat', cursive;
+  --font-dm: 'DM Sans', system-ui, -apple-system, sans-serif;
+
+  --color-canvas: #fafaf8;
+  --color-canvas-dark: #1a1a1a;
+  --color-note-yellow: #fff9b1;
+  --color-note-pink: #ffcce0;
+  --color-note-blue: #d0e8ff;
+  --color-note-green: #d4f5d4;
+  --color-note-orange: #ffe0b2;
+  --color-note-purple: #e8d5f5;
+
+  --color-note-yellow-dark: #4a4520;
+  --color-note-pink-dark: #4a2035;
+  --color-note-blue-dark: #1e3a5f;
+  --color-note-green-dark: #1e3a1e;
+  --color-note-orange-dark: #4a3520;
+  --color-note-purple-dark: #352045;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-dm);
+}
+
+body {
+  background-color: var(--color-canvas);
+  transition: background-color 0.3s ease;
+}
+
+body.dark {
+  background-color: var(--color-canvas-dark);
+}
+
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(224,224,224,0.4) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.dark .dot-grid {
+  background-image: radial-gradient(circle, rgba(51,51,51,0.4) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.note-shadow {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 4px 8px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.note-shadow-drag {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.06);
+}
+
+/* Pinned note amber glow */
+.note-pinned {
+  box-shadow:
+    0 0 0 1.5px rgba(217, 119, 6, 0.35),
+    0 0 8px rgba(217, 119, 6, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 4px 8px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease;
+}
+
+.note-texture {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+.note-curl::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(
+    225deg,
+    transparent 50%,
+    rgba(0, 0, 0, 0.03) 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  border-radius: 0 0 2px 0;
+  pointer-events: none;
+}
+
+textarea.note-input {
+  font-family: var(--font-caveat);
+  font-size: 1.15rem;
+  line-height: 1.4;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  width: 100%;
+  height: 100%;
+  color: #333;
+  padding: 0;
+}
+
+.dark textarea.note-input {
+  color: #e0e0e0;
+}
+
+.search-highlight {
+  background-color: rgba(255, 200, 0, 0.4);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(0, 0, 0, 0.2);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+*:hover > .resize-handle {
+  opacity: 1;
+}
