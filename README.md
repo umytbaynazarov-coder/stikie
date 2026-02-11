@@ -1,73 +1,57 @@
-# React + TypeScript + Vite
+# stikie
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The fastest way to capture a thought. No sign-up. No cloud. Just you and your notes.
 
-Currently, two official plugins are available:
+**[stikie.net](https://stikie.net)**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- **Infinite canvas** — pan, zoom, and place notes anywhere
+- **Pin notes** — fix important notes to the viewport
+- **Custom context menu** — right-click notes to change color, pin, duplicate, or delete. Right-click canvas to create notes, rearrange, or clear all
+- **Dark mode** — toggle between light and dark themes
+- **Search & filter** — find notes by text or filter by color
+- **Archive** — soft-delete with undo, view and restore from archive panel
+- **Keyboard shortcuts** — Ctrl+N, Ctrl+F, Ctrl+P, Ctrl+Z, Delete, Escape
+- **PWA** — install as a native app, works offline
+- **Mobile** — responsive list view with swipe-to-delete and long-press context menu
+- **Local-only** — all data stays in your browser's localStorage
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+React 19 / Zustand 5 / Framer Motion 12 / Tailwind CSS v4 / Vite 7 / TypeScript
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Changelog
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### v1.0.0 — Current Release
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- Infinite canvas with pan & zoom
+- Sticky notes with drag, resize, color cycling, and rotation
+- Pin notes to viewport (max 5)
+- Archive system with undo
+- Dark mode
+- Search with text + color filters
+- Custom right-click context menu (color picker, pin, duplicate, delete, rearrange, clear all)
+- Mobile long-press context menu
+- Keyboard shortcuts
+- Export / import notes as JSON
+- PWA with offline support
+
+### v1.1 — Coming Soon
+
+- Markdown support inside notes
+- Note tags and tag filtering
+- Drag-to-select multiple notes
+- Collaboration via shared links
+- Cloud sync (optional, opt-in)
+
+## License
+
+MIT
