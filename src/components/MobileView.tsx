@@ -2,7 +2,8 @@ import { useRef, useCallback, useState } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform, type PanInfo } from 'framer-motion'
 
 import { useNoteStore } from '../store/useNoteStore'
-import { COLOR_MAP, COLOR_MAP_DARK, COLOR_TOP_STRIP, COLOR_TOP_STRIP_DARK, formatTimestamp, type NoteColor } from '../utils/helpers'
+import { formatTimestamp, type NoteColor } from '../utils/helpers'
+import { getTheme, getFontFamily, type ThemeConfig } from '../utils/customization'
 
 export default function MobileView() {
   const allNotes = useNoteStore((s) => s.notes)
@@ -13,7 +14,10 @@ export default function MobileView() {
   const togglePin = useNoteStore((s) => s.togglePin)
   const searchQuery = useNoteStore((s) => s.searchQuery)
   const activeColorFilters = useNoteStore((s) => s.activeColorFilters)
-  const darkMode = useNoteStore((s) => s.darkMode)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const fontId = useNoteStore((s) => s.customization.global.font)
+  const theme = getTheme(themeId)
+  const noteFontFamily = getFontFamily(fontId)
 
   const query = searchQuery.toLowerCase()
 
@@ -38,17 +42,17 @@ export default function MobileView() {
           transition={{ duration: 0.5, delay: 0.1 }}
         >
           <div className="text-center">
-            <p className="text-2xl text-gray-400 mb-1 font-semibold" style={{ fontFamily: "'Caveat', cursive" }}>
+            <p className="text-2xl mb-1 font-semibold" style={{ fontFamily: "'Caveat', cursive", color: theme.textMuted }}>
               stikie
             </p>
-            <p className="text-gray-400 mb-3" style={{ fontFamily: "'Caveat', cursive", fontSize: '1.3rem' }}>
+            <p className="mb-3" style={{ fontFamily: "'Caveat', cursive", fontSize: '1.3rem', color: theme.textMuted }}>
               The fastest way to capture a thought.
             </p>
-            <p className="text-xs text-gray-400/70 mb-4" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <p className="text-xs mb-4" style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted, opacity: 0.7 }}>
               No sign-up. No cloud. Just you and your notes.
             </p>
-            <p className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Tap <span className="inline-flex items-center justify-center w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-full text-xs font-bold">+</span> to start
+            <p className="text-sm" style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted }}>
+              Tap <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold" style={{ backgroundColor: theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }}>+</span> to start
             </p>
           </div>
         </motion.div>
@@ -59,8 +63,8 @@ export default function MobileView() {
         {pinnedNotes.length > 0 && (
           <>
             <div
-              className="text-[10px] text-gray-400 uppercase tracking-wider px-1 flex items-center gap-1.5 pt-1"
-              style={{ fontFamily: "'DM Sans', sans-serif" }}
+              className="text-[10px] uppercase tracking-wider px-1 flex items-center gap-1.5 pt-1"
+              style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted }}
             >
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 17v5" />
@@ -77,12 +81,13 @@ export default function MobileView() {
                   onUpdate={(content) => updateNote(note.id, { content })}
                   onCycleColor={() => cycleColor(note.id)}
                   onTogglePin={() => togglePin(note.id)}
-                  darkMode={darkMode}
+                  theme={theme}
+                  noteFontFamily={noteFontFamily}
                 />
               ))}
             </AnimatePresence>
             {unpinnedNotes.length > 0 && (
-              <div className="border-t border-gray-200 dark:border-gray-700" />
+              <div style={{ borderTop: `1px solid ${theme.menuBorder}` }} />
             )}
           </>
         )}
@@ -97,7 +102,8 @@ export default function MobileView() {
               onUpdate={(content) => updateNote(note.id, { content })}
               onCycleColor={() => cycleColor(note.id)}
               onTogglePin={() => togglePin(note.id)}
-              darkMode={darkMode}
+              theme={theme}
+              noteFontFamily={noteFontFamily}
             />
           ))}
         </AnimatePresence>
@@ -108,8 +114,8 @@ export default function MobileView() {
         onClick={() => addNote()}
         className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center z-40"
         style={{
-          background: '#333',
-          color: '#fff',
+          background: theme.fabBg,
+          color: theme.fabColor,
           boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
           fontFamily: "'DM Sans', sans-serif",
           fontSize: '1.5rem',
@@ -127,17 +133,18 @@ interface MobileNoteProps {
   onUpdate: (content: string) => void
   onCycleColor: () => void
   onTogglePin: () => void
-  darkMode: boolean
+  theme: ThemeConfig
+  noteFontFamily: string
 }
 
-function MobileNote({ note, onDelete, onUpdate, onCycleColor, onTogglePin, darkMode }: MobileNoteProps) {
+function MobileNote({ note, onDelete, onUpdate, onCycleColor, onTogglePin, theme, noteFontFamily }: MobileNoteProps) {
   const [isEditing, setIsEditing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const x = useMotionValue(0)
   const opacity = useTransform(x, [-150, 0, 150], [0.3, 1, 0.3])
-  const bgColor = darkMode ? COLOR_MAP_DARK[note.color] : COLOR_MAP[note.color]
-  const stripColor = darkMode ? COLOR_TOP_STRIP_DARK[note.color] : COLOR_TOP_STRIP[note.color]
+  const bgColor = theme.noteColors[note.color]
+  const stripColor = theme.noteTopStrip[note.color]
 
   const handleDragEnd = useCallback(
     (_: unknown, info: PanInfo) => {
@@ -179,8 +186,8 @@ function MobileNote({ note, onDelete, onUpdate, onCycleColor, onTogglePin, darkM
           style={{ backgroundColor: stripColor, opacity: 0.6 }}
         >
           <div
-            className="w-3 h-3 rounded-full border border-black/10 cursor-pointer"
-            style={{ backgroundColor: stripColor }}
+            className="w-3 h-3 rounded-full cursor-pointer"
+            style={{ backgroundColor: stripColor, border: `1px solid ${theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}` }}
             onClick={onCycleColor}
           />
           <div className="flex-1" />
@@ -188,7 +195,7 @@ function MobileNote({ note, onDelete, onUpdate, onCycleColor, onTogglePin, darkM
           <button
             onClick={onTogglePin}
             className="flex items-center justify-center"
-            style={{ color: note.pinned ? '#d97706' : '#999' }}
+            style={{ color: note.pinned ? '#d97706' : theme.textMuted }}
           >
             <svg
               width="10"
@@ -207,6 +214,7 @@ function MobileNote({ note, onDelete, onUpdate, onCycleColor, onTogglePin, darkM
         </div>
         <div
           className="px-3 py-2 min-h-[80px]"
+          style={{ fontFamily: noteFontFamily, color: theme.text }}
           onClick={() => {
             setIsEditing(true)
             setTimeout(() => textareaRef.current?.focus(), 50)
@@ -230,24 +238,22 @@ function MobileNote({ note, onDelete, onUpdate, onCycleColor, onTogglePin, darkM
           ) : (
             <div
               style={{
-                fontFamily: "'Caveat', cursive",
                 fontSize: '1.1rem',
                 lineHeight: 1.4,
-                color: darkMode ? '#e0e0e0' : '#333',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 minHeight: 60,
               }}
             >
-              {note.content || <span style={{ color: darkMode ? '#666' : '#aaa' }}>Tap to edit...</span>}
+              {note.content || <span style={{ color: theme.textPlaceholder }}>Tap to edit...</span>}
             </div>
           )}
         </div>
         <div className="px-3 pb-1.5 flex justify-between items-center">
-          <span className="text-[10px] text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <span className="text-[10px]" style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted }}>
             {formatTimestamp(note.updatedAt)}
           </span>
-          <span className="text-[10px] text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <span className="text-[10px]" style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted }}>
             swipe to archive
           </span>
         </div>

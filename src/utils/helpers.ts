@@ -36,41 +36,6 @@ export function migrateNote(raw: Record<string, unknown>): Note {
   }
 }
 
-export const COLOR_MAP: Record<NoteColor, string> = {
-  yellow: '#fff9b1',
-  pink: '#ffcce0',
-  blue: '#d0e8ff',
-  green: '#d4f5d4',
-  orange: '#ffe0b2',
-  purple: '#e8d5f5',
-}
-
-export const COLOR_MAP_DARK: Record<NoteColor, string> = {
-  yellow: '#4a4520',
-  pink: '#4a2035',
-  blue: '#1e3a5f',
-  green: '#1e3a1e',
-  orange: '#4a3520',
-  purple: '#352045',
-}
-
-export const COLOR_TOP_STRIP: Record<NoteColor, string> = {
-  yellow: '#f0e68c',
-  pink: '#f0b0c8',
-  blue: '#b0d0f0',
-  green: '#b0e0b0',
-  orange: '#f0c890',
-  purple: '#d0b0e0',
-}
-
-export const COLOR_TOP_STRIP_DARK: Record<NoteColor, string> = {
-  yellow: '#5c5528',
-  pink: '#5c2840',
-  blue: '#264a70',
-  green: '#264a26',
-  orange: '#5c4528',
-  purple: '#402850',
-}
 
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 11) + Date.now().toString(36)

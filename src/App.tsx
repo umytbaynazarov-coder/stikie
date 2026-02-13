@@ -8,6 +8,7 @@ import SpeedBadge from './components/SpeedBadge'
 import InstallPrompt from './components/InstallPrompt'
 import ContextMenu from './components/ContextMenu'
 import MobileView from './components/MobileView'
+import CustomizationToolbar from './components/CustomizationToolbar'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 import { useIsMobile } from './hooks/useIsMobile'
 
@@ -28,6 +29,7 @@ export default function App() {
       <SpeedBadge />
       <InstallPrompt />
       <ContextMenu />
+      {!isMobile && <CustomizationToolbar />}
     </div>
   )
 }

@@ -2,7 +2,8 @@ import { useEffect, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNoteStore } from '../store/useNoteStore'
 import { useIsMobile } from '../hooks/useIsMobile'
-import { COLOR_MAP, COLOR_MAP_DARK, COLOR_TOP_STRIP, COLOR_TOP_STRIP_DARK, formatTimestamp } from '../utils/helpers'
+import { formatTimestamp } from '../utils/helpers'
+import { getTheme, getFontFamily } from '../utils/customization'
 
 export default function ArchivePanel() {
   const open = useNoteStore((s) => s.archivePanelOpen)
@@ -17,7 +18,10 @@ export default function ArchivePanel() {
   const restoreNote = useNoteStore((s) => s.restoreNote)
   const permanentlyDelete = useNoteStore((s) => s.permanentlyDelete)
   const clearArchive = useNoteStore((s) => s.clearArchive)
-  const darkMode = useNoteStore((s) => s.darkMode)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const fontId = useNoteStore((s) => s.customization.global.font)
+  const theme = getTheme(themeId)
+  const noteFontFamily = getFontFamily(fontId)
   const isMobile = useIsMobile()
   const panelRef = useRef<HTMLDivElement>(null)
 
@@ -58,7 +62,7 @@ export default function ArchivePanel() {
           {/* Light backdrop */}
           <motion.div
             className="fixed inset-0 z-45"
-            style={{ background: darkMode ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)' }}
+            style={{ background: theme.isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -70,7 +74,7 @@ export default function ArchivePanel() {
             className="fixed top-0 right-0 h-full z-50 flex flex-col rounded-l-xl"
             style={{
               width: isMobile ? '100%' : 320,
-              background: darkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)',
+              background: theme.menuBg,
               backdropFilter: 'blur(12px)',
               boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
               fontFamily: "'DM Sans', sans-serif",
@@ -84,23 +88,23 @@ export default function ArchivePanel() {
             <div
               className="px-4 py-3 border-b flex items-center justify-between shrink-0"
               style={{
-                borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-                background: darkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)',
+                borderColor: theme.menuBorder,
+                background: theme.menuBg,
                 backdropFilter: 'blur(8px)',
               }}
             >
               <h2
                 className="text-base font-semibold"
-                style={{ color: darkMode ? '#e0e0e0' : '#555' }}
+                style={{ color: theme.text }}
               >
                 Archive ({archivedNotes.length})
               </h2>
               <button
                 onClick={() => setOpen(false)}
                 className="p-1 rounded-md transition-colors"
-                style={{ color: darkMode ? '#999' : '#999' }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = darkMode ? '#ddd' : '#333' }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#999' }}
+                style={{ color: theme.textMuted }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = theme.text }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = theme.textMuted }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
@@ -113,7 +117,7 @@ export default function ArchivePanel() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {archivedNotes.length === 0 ? (
                 <div className="flex items-center justify-center h-32">
-                  <p className="text-sm" style={{ color: darkMode ? '#666' : '#aaa' }}>
+                  <p className="text-sm" style={{ color: theme.textPlaceholder }}>
                     No archived stikies
                   </p>
                 </div>
@@ -128,27 +132,27 @@ export default function ArchivePanel() {
                       exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ duration: 0.15 }}
                       className="rounded-lg overflow-hidden"
-                      style={{ backgroundColor: darkMode ? COLOR_MAP_DARK[note.color] : COLOR_MAP[note.color] }}
+                      style={{ backgroundColor: theme.noteColors[note.color] }}
                     >
                       {/* Color strip */}
                       <div
                         className="h-3"
-                        style={{ backgroundColor: darkMode ? COLOR_TOP_STRIP_DARK[note.color] : COLOR_TOP_STRIP[note.color], opacity: 0.6 }}
+                        style={{ backgroundColor: theme.noteTopStrip[note.color], opacity: 0.6 }}
                       />
                       {/* Content preview */}
                       <div className="px-3 py-2">
                         <p
                           className="leading-snug"
                           style={{
-                            fontFamily: "'Caveat', cursive",
+                            fontFamily: noteFontFamily,
                             fontSize: '1rem',
-                            color: darkMode ? '#e0e0e0' : '#444',
+                            color: theme.text,
                           }}
                         >
                           {note.content.slice(0, 50) || 'Empty note'}
                           {note.content.length > 50 ? '...' : ''}
                         </p>
-                        <p className="text-[10px] mt-1" style={{ color: '#888' }}>
+                        <p className="text-[10px] mt-1" style={{ color: theme.textMuted }}>
                           Archived {note.archivedAt ? formatTimestamp(note.archivedAt) : ''}
                         </p>
                       </div>
@@ -158,11 +162,11 @@ export default function ArchivePanel() {
                           onClick={() => restoreNote(note.id)}
                           className="text-xs px-2.5 py-1 rounded transition-colors"
                           style={{
-                            backgroundColor: 'rgba(255,255,255,0.5)',
-                            color: '#555',
+                            backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                            color: theme.text,
                           }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.8)' }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.5)' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.1)' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }}
                         >
                           Restore
                         </button>
@@ -189,13 +193,13 @@ export default function ArchivePanel() {
             {archivedNotes.length > 0 && (
               <div
                 className="p-3 border-t shrink-0"
-                style={{ borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
+                style={{ borderColor: theme.menuBorder }}
               >
                 <button
                   onClick={clearArchive}
                   className="w-full text-center text-sm py-2 rounded-lg transition-colors"
                   style={{ color: '#ef4444' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.06)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.06)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                 >
                   Clear Archive ({archivedNotes.length})

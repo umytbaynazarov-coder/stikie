@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNoteStore } from '../store/useNoteStore'
+import { getTheme } from '../utils/customization'
 
 export default function UndoToast() {
   const deletedStack = useNoteStore((s) => s.deletedStack)
   const undoDelete = useNoteStore((s) => s.undoDelete)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const theme = getTheme(themeId)
   const [visible, setVisible] = useState(false)
   const [lastLength, setLastLength] = useState(0)
 
@@ -35,21 +38,24 @@ export default function UndoToast() {
           <div
             className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
             style={{
-              background: 'rgba(40,40,40,0.9)',
+              background: theme.isDark ? 'rgba(40,40,40,0.9)' : 'rgba(255,255,255,0.92)',
               backdropFilter: 'blur(12px)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+              boxShadow: theme.isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.1)',
               fontFamily: "'DM Sans', sans-serif",
+              border: `1px solid ${theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
             }}
           >
-            <span className="text-sm" style={{ color: '#e0e0e0' }}>Stikie archived</span>
+            <span className="text-sm" style={{ color: theme.text }}>Stikie archived</span>
             <button
               onClick={handleUndo}
-              className="text-sm font-semibold px-2 py-0.5 rounded-md hover:bg-white/10 transition-colors"
-              style={{ color: '#ffd666' }}
+              className="text-sm font-semibold px-2 py-0.5 rounded-md transition-colors"
+              style={{ color: theme.isDark ? '#ffd666' : '#d97706' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
             >
               Undo
             </button>
-            <span className="text-xs text-gray-400">Ctrl+Z</span>
+            <span className="text-xs" style={{ color: theme.textMuted }}>Ctrl+Z</span>
           </div>
         </motion.div>
       )}

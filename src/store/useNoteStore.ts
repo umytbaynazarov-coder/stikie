@@ -1,9 +1,24 @@
 import { create } from 'zustand'
 import { type Note, type NoteColor, NOTE_COLORS, generateId, getRandomRotation, getSmartPosition, migrateNote, MAX_PINNED_NOTES } from '../utils/helpers'
+import {
+  type ThemeId,
+  type CanvasType,
+  type FontId,
+  type LayoutMode,
+  type CustomizationStore,
+  DEFAULT_SETTINGS,
+  applyThemeToDOM,
+  loadGoogleFonts,
+  calculateGridLayout,
+  calculateRadialLayout,
+  calculateTimelineLayout,
+  FONTS,
+} from '../utils/customization'
 
 const STORAGE_KEY = 'stikie-net-notes'
 const DARK_MODE_KEY = 'stikie-net-dark'
 const CANVAS_KEY = 'stikie-net-canvas'
+const CUSTOMIZATION_KEY = 'stikie-net-customization'
 
 function loadNotes(): Note[] {
   try {
@@ -20,12 +35,38 @@ function saveNotes(notes: Note[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
 }
 
-function loadDarkMode(): boolean {
+function loadCustomization(): CustomizationStore {
   try {
-    return localStorage.getItem(DARK_MODE_KEY) === 'true'
+    const raw = localStorage.getItem(CUSTOMIZATION_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as CustomizationStore
+      return {
+        global: { ...DEFAULT_SETTINGS, ...parsed.global },
+        boards: parsed.boards || {},
+      }
+    }
   } catch {
-    return false
+    // fall through
   }
+
+  // Migrate from old dark mode setting
+  try {
+    const oldDark = localStorage.getItem(DARK_MODE_KEY)
+    if (oldDark === 'true') {
+      return {
+        global: { ...DEFAULT_SETTINGS, theme: 'onyx' as ThemeId },
+        boards: {},
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  return { global: { ...DEFAULT_SETTINGS }, boards: {} }
+}
+
+function saveCustomization(store: CustomizationStore) {
+  localStorage.setItem(CUSTOMIZATION_KEY, JSON.stringify(store))
 }
 
 function loadCanvas(): { x: number; y: number; zoom: number } {
@@ -45,7 +86,6 @@ interface DeletedNote {
 
 interface NoteStore {
   notes: Note[]
-  darkMode: boolean
   canvasX: number
   canvasY: number
   zoom: number
@@ -58,6 +98,9 @@ interface NoteStore {
   archivePanelOpen: boolean
   pinLimitToast: boolean
   activeColorFilters: NoteColor[]
+
+  // Customization
+  customization: CustomizationStore
 
   addNote: (x?: number, y?: number) => string
   updateNote: (id: string, updates: Partial<Note>) => void
@@ -72,7 +115,6 @@ interface NoteStore {
   setSearchOpen: (open: boolean) => void
   setSelectedNote: (id: string | null) => void
   setEditingNote: (id: string | null) => void
-  toggleDarkMode: () => void
   exportNotes: () => string
   importNotes: (json: string) => boolean
   clearAllNotes: () => void
@@ -86,12 +128,27 @@ interface NoteStore {
   setActiveColorFilters: (colors: NoteColor[]) => void
   duplicateNote: (id: string) => string
   rearrangeNotes: () => void
+
+  // Customization actions
+  setTheme: (theme: ThemeId) => void
+  setCanvasType: (canvas: CanvasType) => void
+  setFont: (font: FontId) => void
+  setLayout: (layout: LayoutMode) => void
 }
 
 export const useNoteStore = create<NoteStore>((set, get) => {
   const initial = loadCanvas()
-  const initialDark = loadDarkMode()
-  if (initialDark) document.body.classList.add('dark')
+  const initialCustomization = loadCustomization()
+
+  // Apply initial theme to DOM
+  applyThemeToDOM(initialCustomization.global.theme)
+
+  // Load Google Fonts for all font options so they're available in preview
+  const fontsToLoad = Object.keys(FONTS).filter((id) => FONTS[id as FontId].googleFont) as FontId[]
+  loadGoogleFonts(fontsToLoad)
+
+  // Clean up old dark mode key
+  localStorage.removeItem(DARK_MODE_KEY)
 
   const initialNotes = loadNotes()
   const initialRotations: Record<string, number> = {}
@@ -101,7 +158,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
 
   return {
     notes: initialNotes,
-    darkMode: initialDark,
     canvasX: initial.x,
     canvasY: initial.y,
     zoom: initial.zoom,
@@ -114,6 +170,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
     archivePanelOpen: false,
     pinLimitToast: false,
     activeColorFilters: [],
+    customization: initialCustomization,
 
     addNote: (x?: number, y?: number) => {
       const { notes, canvasX, canvasY, zoom } = get()
@@ -158,7 +215,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
       })
     },
 
-    // deleteNote now archives instead of removing
     deleteNote: (id) => {
       set((state) => {
         const idx = state.notes.findIndex((n) => n.id === id)
@@ -184,7 +240,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
       const type = last.type || 'deleted'
 
       if (type === 'archived') {
-        // Restore from archive: un-archive the note
         set((state) => {
           const newNotes = state.notes.map((n) =>
             n.id === last.note.id ? { ...n, archived: false, archivedAt: null } : n
@@ -196,7 +251,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           }
         })
       } else {
-        // Restore from permanent delete: splice back in
         set((state) => {
           const newNotes = [...state.notes]
           const insertIdx = Math.min(last.index, newNotes.length)
@@ -266,19 +320,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
     setSelectedNote: (id) => set({ selectedNoteId: id }),
     setEditingNote: (id) => set({ editingNoteId: id }),
 
-    toggleDarkMode: () => {
-      set((state) => {
-        const newDark = !state.darkMode
-        localStorage.setItem(DARK_MODE_KEY, String(newDark))
-        if (newDark) {
-          document.body.classList.add('dark')
-        } else {
-          document.body.classList.remove('dark')
-        }
-        return { darkMode: newDark }
-      })
-    },
-
     exportNotes: () => JSON.stringify(get().notes, null, 2),
 
     importNotes: (json) => {
@@ -301,7 +342,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
       set({ notes: [], rotations: {}, selectedNoteId: null, editingNoteId: null })
     },
 
-    // Pin: converts coordinates between canvas-space and screen-space
     togglePin: (id) => {
       const { notes, canvasX, canvasY, zoom } = get()
       const note = notes.find((n) => n.id === id)
@@ -313,7 +353,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           set({ pinLimitToast: true })
           return
         }
-        // Pinning: convert canvas-space to screen-space
         const screenX = note.x * zoom + canvasX
         const screenY = note.y * zoom + canvasY
         set((state) => {
@@ -324,7 +363,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           return { notes: newNotes }
         })
       } else {
-        // Unpinning: convert screen-space back to canvas-space
         const canvasSpaceX = (note.x - canvasX) / zoom
         const canvasSpaceY = (note.y - canvasY) / zoom
         set((state) => {
@@ -390,7 +428,6 @@ export const useNoteStore = create<NoteStore>((set, get) => {
       const source = notes.find((n) => n.id === id)
       if (!source || source.archived) return ''
       const newId = generateId()
-      // If source is pinned, convert screen-space → canvas-space for the duplicate
       const baseX = source.pinned ? (source.x - canvasX) / zoom : source.x
       const baseY = source.pinned ? (source.y - canvasY) / zoom : source.y
       const duplicate: Note = {
@@ -420,38 +457,104 @@ export const useNoteStore = create<NoteStore>((set, get) => {
       const active = notes.filter((n) => !n.archived && !n.pinned)
       if (active.length === 0) return
 
-      const NOTE_W = 220
-      const NOTE_H = 180
-      const GAP = 30
-      const cols = Math.max(1, Math.floor(Math.sqrt(active.length * 1.5)))
-      const rows = Math.ceil(active.length / cols)
-      const totalW = cols * NOTE_W + (cols - 1) * GAP
-      const totalH = rows * NOTE_H + (rows - 1) * GAP
-
-      const viewCenterX = (-canvasX + window.innerWidth / 2) / zoom
-      const viewCenterY = (-canvasY + window.innerHeight / 2) / zoom
-      const startX = viewCenterX - totalW / 2
-      const startY = viewCenterY - totalH / 2
-
+      const positions = calculateGridLayout(active.length, canvasX, canvasY, zoom)
       const activeIds = new Set(active.map((n) => n.id))
       let idx = 0
 
       set((state) => {
         const newNotes = state.notes.map((n) => {
           if (!activeIds.has(n.id)) return n
-          const col = idx % cols
-          const row = Math.floor(idx / cols)
-          idx++
-          return {
-            ...n,
-            x: startX + col * (NOTE_W + GAP),
-            y: startY + row * (NOTE_H + GAP),
-            updatedAt: Date.now(),
-          }
+          const pos = positions[idx++]
+          return { ...n, x: pos.x, y: pos.y, updatedAt: Date.now() }
         })
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+    },
+
+    // ── Customization Actions ──────────────────────────────────────
+
+    setTheme: (theme) => {
+      applyThemeToDOM(theme)
+      set((state) => {
+        const newCustomization: CustomizationStore = {
+          ...state.customization,
+          global: { ...state.customization.global, theme },
+        }
+        saveCustomization(newCustomization)
+        return { customization: newCustomization }
+      })
+    },
+
+    setCanvasType: (canvas) => {
+      set((state) => {
+        const newCustomization: CustomizationStore = {
+          ...state.customization,
+          global: { ...state.customization.global, canvas },
+        }
+        saveCustomization(newCustomization)
+        return { customization: newCustomization }
+      })
+    },
+
+    setFont: (font) => {
+      set((state) => {
+        const newCustomization: CustomizationStore = {
+          ...state.customization,
+          global: { ...state.customization.global, font },
+        }
+        saveCustomization(newCustomization)
+        return { customization: newCustomization }
+      })
+    },
+
+    setLayout: (layout) => {
+      const { notes, canvasX, canvasY, zoom } = get()
+      const active = notes.filter((n) => !n.archived && !n.pinned)
+
+      // Apply layout arrangement (except freeform)
+      if (layout !== 'freeform' && active.length > 0) {
+        let positions: { x: number; y: number }[]
+
+        switch (layout) {
+          case 'grid':
+            positions = calculateGridLayout(active.length, canvasX, canvasY, zoom)
+            break
+          case 'radial':
+            positions = calculateRadialLayout(active.length, canvasX, canvasY, zoom)
+            break
+          case 'timeline':
+            positions = calculateTimelineLayout(active.length, canvasX, canvasY, zoom)
+            break
+        }
+
+        const activeIds = new Set(active.map((n) => n.id))
+        let idx = 0
+
+        set((state) => {
+          const newNotes = state.notes.map((n) => {
+            if (!activeIds.has(n.id)) return n
+            const pos = positions[idx++]
+            return { ...n, x: pos.x, y: pos.y, updatedAt: Date.now() }
+          })
+          saveNotes(newNotes)
+          const newCustomization: CustomizationStore = {
+            ...state.customization,
+            global: { ...state.customization.global, layout },
+          }
+          saveCustomization(newCustomization)
+          return { notes: newNotes, customization: newCustomization }
+        })
+      } else {
+        set((state) => {
+          const newCustomization: CustomizationStore = {
+            ...state.customization,
+            global: { ...state.customization.global, layout },
+          }
+          saveCustomization(newCustomization)
+          return { customization: newCustomization }
+        })
+      }
     },
   }
 })

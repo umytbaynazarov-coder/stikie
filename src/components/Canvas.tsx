@@ -2,6 +2,7 @@ import { useRef, useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNoteStore } from '../store/useNoteStore'
 import { type NoteColor } from '../utils/helpers'
+import { getTheme } from '../utils/customization'
 import StickyNote from './StickyNote'
 
 export default function Canvas() {
@@ -18,6 +19,9 @@ export default function Canvas() {
   const setSelectedNote = useNoteStore((s) => s.setSelectedNote)
   const setEditingNote = useNoteStore((s) => s.setEditingNote)
   const rotations = useNoteStore((s) => s.rotations)
+  const canvasType = useNoteStore((s) => s.customization.global.canvas)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const theme = getTheme(themeId)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -122,7 +126,7 @@ export default function Canvas() {
     <div
       ref={containerRef}
       data-canvas
-      className="w-full h-full dot-grid overflow-hidden"
+      className={`w-full h-full canvas-${canvasType} overflow-hidden`}
       style={{ cursor: isPanning ? 'grabbing' : 'default' }}
       onDoubleClick={handleCanvasDoubleClick}
       onClick={handleCanvasClick}
@@ -190,17 +194,17 @@ export default function Canvas() {
           transition={{ duration: 0.5, delay: 0.1 }}
         >
           <div className="text-center">
-            <p className="text-2xl text-gray-400 mb-1 font-semibold" style={{ fontFamily: "'Caveat', cursive" }}>
+            <p className="text-2xl mb-1 font-semibold" style={{ fontFamily: "'Caveat', cursive", color: theme.textMuted }}>
               stikie
             </p>
-            <p className="text-gray-400 mb-3" style={{ fontFamily: "'Caveat', cursive", fontSize: '1.3rem' }}>
+            <p className="mb-3" style={{ fontFamily: "'Caveat', cursive", fontSize: '1.3rem', color: theme.textMuted }}>
               The fastest way to capture a thought.
             </p>
-            <p className="text-xs text-gray-400/70 mb-4" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+            <p className="text-xs mb-4" style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted, opacity: 0.7 }}>
               No sign-up. No cloud. Just you and your notes.
             </p>
-            <p className="text-sm text-gray-400" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-              Double-click anywhere or press <kbd className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Ctrl+N</kbd>
+            <p className="text-sm" style={{ fontFamily: "'DM Sans', sans-serif", color: theme.textMuted }}>
+              Double-click anywhere or press <kbd className="px-1.5 py-0.5 rounded text-xs font-mono" style={{ backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}>Ctrl+N</kbd>
             </p>
           </div>
         </motion.div>

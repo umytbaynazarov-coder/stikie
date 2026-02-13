@@ -1,16 +1,15 @@
 import { useRef, useCallback, useState, useEffect } from 'react'
-import { motion, useMotionValue } from 'framer-motion'
+import { motion, useMotionValue, animate } from 'framer-motion'
 import { useNoteStore } from '../store/useNoteStore'
-import { type Note, COLOR_MAP, COLOR_MAP_DARK, COLOR_TOP_STRIP, COLOR_TOP_STRIP_DARK, formatTimestamp } from '../utils/helpers'
+import { type Note, formatTimestamp } from '../utils/helpers'
+import { getTheme, getFontFamily } from '../utils/customization'
 
 interface StickyNoteProps {
   note: Note
   rotation: number
   dimmed: boolean
   zoom: number
-  /** When provided, note renders at these screen-space coords (for pinned overlay) */
   screenPosition?: { x: number; y: number }
-  /** Custom move commit for pinned overlay (converts screen -> canvas coords) */
   onMoveCommit?: (id: string, x: number, y: number) => void
 }
 
@@ -25,7 +24,10 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
   const editingNoteId = useNoteStore((s) => s.editingNoteId)
   const setSelectedNote = useNoteStore((s) => s.setSelectedNote)
   const setEditingNote = useNoteStore((s) => s.setEditingNote)
-  const darkMode = useNoteStore((s) => s.darkMode)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const fontId = useNoteStore((s) => s.customization.global.font)
+  const theme = getTheme(themeId)
+  const noteFontFamily = getFontFamily(fontId)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -46,11 +48,18 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
   const motionX = useMotionValue(posX)
   const motionY = useMotionValue(posY)
 
-  // Sync motion values when position changes
+  // Sync motion values when position changes (animate for layout transitions)
+  const isFirstRender = useRef(true)
   useEffect(() => {
     if (!isDragging) {
-      motionX.set(posX)
-      motionY.set(posY)
+      if (isFirstRender.current) {
+        motionX.set(posX)
+        motionY.set(posY)
+        isFirstRender.current = false
+      } else {
+        animate(motionX, posX, { type: 'spring', stiffness: 200, damping: 25 })
+        animate(motionY, posY, { type: 'spring', stiffness: 200, damping: 25 })
+      }
     }
   }, [posX, posY, isDragging, motionX, motionY])
 
@@ -77,9 +86,7 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (isEditing || isResizing) return
-      // Only drag from left mouse button
       if (e.button !== 0) return
-      // Don't start drag from buttons or textarea
       const target = e.target as HTMLElement
       if (target.tagName === 'BUTTON' || target.tagName === 'TEXTAREA' || target.closest('button')) return
 
@@ -198,8 +205,8 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
     [note.id, togglePin]
   )
 
-  const bgColor = darkMode ? COLOR_MAP_DARK[note.color] : COLOR_MAP[note.color]
-  const stripColor = darkMode ? COLOR_TOP_STRIP_DARK[note.color] : COLOR_TOP_STRIP[note.color]
+  const bgColor = theme.noteColors[note.color]
+  const stripColor = theme.noteTopStrip[note.color]
 
   return (
     <motion.div
@@ -254,8 +261,8 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
           className="absolute top-1 left-1 w-5 h-5 flex items-center justify-center rounded-full text-xs z-10 transition-opacity"
           style={{
             opacity: isPinned ? 1 : 0,
-            color: isPinned ? '#d97706' : '#666',
-            backgroundColor: isPinned ? 'rgba(217,119,6,0.1)' : 'rgba(0,0,0,0.08)',
+            color: isPinned ? '#d97706' : theme.textMuted,
+            backgroundColor: isPinned ? 'rgba(217,119,6,0.1)' : (theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
           }}
           onClick={handlePinClick}
           title={isPinned ? 'Unpin note' : 'Pin note'}
@@ -280,7 +287,7 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
         {/* Delete button — top right */}
         <button
           className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-xs opacity-0 hover:opacity-100 transition-opacity z-10"
-          style={{ color: '#666', backgroundColor: 'rgba(0,0,0,0.08)' }}
+          style={{ color: theme.textMuted, backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
           onClick={handleDelete}
           title="Archive note"
           onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
@@ -289,7 +296,10 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
         </button>
 
         {/* Content area */}
-        <div className="px-3 pt-2 pb-1 flex-1 min-h-0 overflow-hidden">
+        <div
+          className="px-3 pt-2 pb-1 flex-1 min-h-0 overflow-hidden"
+          style={{ fontFamily: noteFontFamily, color: theme.text }}
+        >
           {isEditing ? (
             <textarea
               ref={textareaRef}
@@ -309,16 +319,14 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
             <div
               className="w-full h-full overflow-hidden cursor-text"
               style={{
-                fontFamily: "'Caveat', cursive",
                 fontSize: '1.15rem',
                 lineHeight: 1.4,
-                color: darkMode ? '#e0e0e0' : '#333',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
               }}
             >
               {note.content || (
-                <span style={{ color: darkMode ? '#666' : '#aaa' }}>Double-click to edit...</span>
+                <span style={{ color: theme.textPlaceholder }}>Double-click to edit...</span>
               )}
             </div>
           )}
@@ -327,7 +335,7 @@ export default function StickyNote({ note, rotation, dimmed, zoom, screenPositio
         {/* Timestamp */}
         <div
           className="px-3 pb-1 text-xs shrink-0"
-          style={{ color: darkMode ? '#888' : '#999', fontFamily: "'DM Sans', sans-serif" }}
+          style={{ color: theme.textMuted, fontFamily: "'DM Sans', sans-serif" }}
         >
           {formatTimestamp(note.updatedAt)}
         </div>

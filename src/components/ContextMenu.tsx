@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNoteStore } from '../store/useNoteStore'
-import { NOTE_COLORS, COLOR_MAP, COLOR_MAP_DARK, type NoteColor } from '../utils/helpers'
+import { NOTE_COLORS, type NoteColor } from '../utils/helpers'
+import { getTheme } from '../utils/customization'
 
 type MenuTarget =
   | { type: 'note'; noteId: string }
@@ -24,7 +25,8 @@ export default function ContextMenu() {
   const menuRef = useRef<HTMLDivElement>(null)
   const [adjusted, setAdjusted] = useState<{ x: number; y: number } | null>(null)
 
-  const darkMode = useNoteStore((s) => s.darkMode)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const theme = getTheme(themeId)
   const notes = useNoteStore((s) => s.notes)
   const addNote = useNoteStore((s) => s.addNote)
   const deleteNote = useNoteStore((s) => s.deleteNote)
@@ -271,11 +273,11 @@ export default function ContextMenu() {
   const posX = adjusted?.x ?? menu.x
   const posY = adjusted?.y ?? menu.y
 
-  const menuBg = darkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)'
-  const menuShadow = darkMode ? '0 8px 32px rgba(0,0,0,0.3)' : '0 8px 32px rgba(0,0,0,0.12)'
-  const textColor = darkMode ? '#e0e0e0' : '#555'
-  const hoverBg = darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
-  const dividerColor = darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'
+  const menuBg = theme.menuBg
+  const menuShadow = theme.isDark ? '0 8px 32px rgba(0,0,0,0.3)' : '0 8px 32px rgba(0,0,0,0.12)'
+  const textColor = theme.text
+  const hoverBg = theme.menuHoverBg
+  const dividerColor = theme.menuBorder
 
   return createPortal(
     <AnimatePresence>
@@ -308,7 +310,8 @@ export default function ContextMenu() {
           {menu.target.type === 'note' ? (
             <NoteMenuItems
               note={activeNote!}
-              darkMode={darkMode}
+              isDark={theme.isDark}
+              noteColors={theme.noteColors}
               submenu={submenu}
               focusedIndex={focusedIndex}
               textColor={textColor}
@@ -325,7 +328,7 @@ export default function ContextMenu() {
             />
           ) : (
             <CanvasMenuItems
-              darkMode={darkMode}
+              isDark={theme.isDark}
               submenu={submenu}
               focusedIndex={focusedIndex}
               textColor={textColor}
@@ -409,7 +412,8 @@ function Divider({ color }: { color: string }) {
 
 function NoteMenuItems({
   note,
-  darkMode,
+  isDark,
+  noteColors,
   submenu,
   focusedIndex,
   textColor,
@@ -420,7 +424,8 @@ function NoteMenuItems({
   onSubmenuToggle,
 }: {
   note: { id: string; pinned: boolean; color: NoteColor } | null
-  darkMode: boolean
+  isDark: boolean
+  noteColors: Record<NoteColor, string>
   submenu: Submenu
   focusedIndex: number
   textColor: string
@@ -458,7 +463,7 @@ function NoteMenuItems({
             <div className="flex items-center justify-center gap-2 py-2 px-3">
               {NOTE_COLORS.map((color) => {
                 const isActive = color === note.color
-                const bg = darkMode ? COLOR_MAP_DARK[color] : COLOR_MAP[color]
+                const bg = noteColors[color]
                 return (
                   <button
                     key={color}
@@ -468,10 +473,10 @@ function NoteMenuItems({
                       height: 22,
                       backgroundColor: bg,
                       border: isActive
-                        ? `2px solid ${darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.35)'}`
-                        : `1.5px solid ${darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
+                        ? `2px solid ${isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.35)'}`
+                        : `1.5px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
                       transform: isActive ? 'scale(1.15)' : 'scale(1)',
-                      boxShadow: isActive ? `0 0 0 2px ${darkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}` : 'none',
+                      boxShadow: isActive ? `0 0 0 2px ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}` : 'none',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -480,7 +485,7 @@ function NoteMenuItems({
                     title={color}
                   >
                     {isActive && (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={darkMode ? '#fff' : '#333'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#fff' : '#333'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     )}
@@ -531,7 +536,7 @@ function NoteMenuItems({
 // --- Canvas Menu ---
 
 function CanvasMenuItems({
-  darkMode,
+  isDark,
   submenu,
   focusedIndex,
   textColor,
@@ -539,7 +544,7 @@ function CanvasMenuItems({
   dividerColor,
   onAction,
 }: {
-  darkMode: boolean
+  isDark: boolean
   submenu: Submenu
   focusedIndex: number
   textColor: string
@@ -555,10 +560,10 @@ function CanvasMenuItems({
         transition={{ duration: 0.1 }}
         style={{ padding: '8px 12px' }}
       >
-        <p style={{ fontSize: 13, fontWeight: 500, color: darkMode ? '#e0e0e0' : '#333', marginBottom: 2 }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: isDark ? '#e0e0e0' : '#333', marginBottom: 2 }}>
           Clear all notes?
         </p>
-        <p style={{ fontSize: 11, color: darkMode ? '#999' : '#888', marginBottom: 10 }}>
+        <p style={{ fontSize: 11, color: isDark ? '#999' : '#888', marginBottom: 10 }}>
           This cannot be undone.
         </p>
         <div className="flex gap-2">
@@ -569,11 +574,11 @@ function CanvasMenuItems({
               fontSize: 12,
               fontWeight: 500,
               color: textColor,
-              backgroundColor: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
               border: 'none',
               cursor: 'pointer',
               fontFamily: "'DM Sans', sans-serif",
-              outline: focusedIndex === 0 ? `2px solid ${darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}` : 'none',
+              outline: focusedIndex === 0 ? `2px solid ${isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'}` : 'none',
             }}
             onClick={() => onAction(0)}
           >

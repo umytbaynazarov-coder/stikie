@@ -1,7 +1,8 @@
 import { useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNoteStore } from '../store/useNoteStore'
-import { NOTE_COLORS, COLOR_MAP, type NoteColor } from '../utils/helpers'
+import { NOTE_COLORS, type NoteColor } from '../utils/helpers'
+import { getTheme } from '../utils/customization'
 
 export default function SearchBar() {
   const searchOpen = useNoteStore((s) => s.searchOpen)
@@ -11,7 +12,8 @@ export default function SearchBar() {
   const notes = useNoteStore((s) => s.notes)
   const activeColorFilters = useNoteStore((s) => s.activeColorFilters)
   const setActiveColorFilters = useNoteStore((s) => s.setActiveColorFilters)
-  const darkMode = useNoteStore((s) => s.darkMode)
+  const themeId = useNoteStore((s) => s.customization.global.theme)
+  const theme = getTheme(themeId)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -50,14 +52,14 @@ export default function SearchBar() {
           <div
             className="rounded-xl backdrop-blur-md"
             style={{
-              background: darkMode ? 'rgba(40,40,40,0.9)' : 'rgba(255,255,255,0.85)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+              background: theme.menuBg,
+              boxShadow: theme.isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.08)',
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
             {/* Search row */}
             <div className="flex items-center gap-2 px-4 py-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={darkMode ? '#888' : '#999'} strokeWidth="1.5" strokeLinecap="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textMuted} strokeWidth="1.5" strokeLinecap="round">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
@@ -72,16 +74,19 @@ export default function SearchBar() {
                 }}
                 placeholder="Search notes..."
                 className="bg-transparent outline-none text-sm w-56"
-                style={{ fontFamily: "'DM Sans', sans-serif", color: darkMode ? '#e0e0e0' : '#333' }}
+                style={{ fontFamily: "'DM Sans', sans-serif", color: theme.text }}
               />
               {hasActiveFilters && (
-                <span className="text-xs text-gray-400 whitespace-nowrap">
+                <span className="text-xs whitespace-nowrap" style={{ color: theme.textMuted }}>
                   {matchCount} match{matchCount !== 1 ? 'es' : ''}
                 </span>
               )}
               <button
                 onClick={() => setSearchOpen(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors ml-1"
+                className="transition-colors ml-1"
+                style={{ color: theme.textMuted }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = theme.text }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = theme.textMuted }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18" />
@@ -100,12 +105,12 @@ export default function SearchBar() {
                     onClick={() => toggleColor(color)}
                     className="w-4 h-4 rounded-full transition-all"
                     style={{
-                      backgroundColor: COLOR_MAP[color],
+                      backgroundColor: theme.noteColors[color],
                       border: isActive
-                        ? `2px solid ${darkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.35)'}`
-                        : `1.5px solid ${darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
+                        ? `2px solid ${theme.isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.35)'}`
+                        : `1.5px solid ${theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
                       boxShadow: isActive
-                        ? `0 0 0 2px ${darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`
+                        ? `0 0 0 2px ${theme.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'}`
                         : 'none',
                       transform: isActive ? 'scale(1.2)' : 'scale(1)',
                     }}
