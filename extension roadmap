@@ -1,0 +1,246 @@
+# Stikie Chrome Extension Roadmap
+
+> Chrome New Tab extension for [stikie.net](https://stikie.net) — quick-capture sticky notes on every new tab, synced to your stikie workspace.
+
+---
+
+## V1 — Backend & Sync Infrastructure (stikie.net)
+
+> **The extension doesn't exist yet.** This phase builds the foundation that makes the extension valuable.
+
+### What Needs to Happen
+
+- [ ] Backend API for stikie.net (REST or similar)
+  - `GET /notes` — fetch all notes
+  - `POST /notes` — create a note
+  - `PUT /notes/:id` — update a note
+  - `DELETE /notes/:id` — delete a note
+- [ ] Auth system (Google OAuth, email/password, or magic link)
+- [ ] Database (migrate from localStorage-only to server-persisted)
+- [ ] Offline-first sync on stikie.net itself (local-first, syncs when online)
+- [ ] User accounts on stikie.net
+
+### Why This Comes First
+
+Without this, the extension is a disconnected toy. With this, every note captured in the extension feeds into stikie.net — creating a real product loop.
+
+---
+
+## V2 — Chrome Extension MVP (Quick Capture)
+
+> The extension is a **capture tool**, not a workspace. Users open a new tab, jot a thought in 2 seconds, and move on. Notes sync to stikie.net.
+
+### Decisions
+
+| Decision | Choice | Why |
+|----------|--------|-----|
+| Architecture | Connected to stikie.net | Notes sync — this is the whole point |
+| Storage | `chrome.storage.local` + API sync | Offline-first, syncs when online |
+| Auth | Google OAuth via `chrome.identity` | One-click sign-in, no passwords |
+| Manifest | V3 | Required for Chrome Web Store |
+| Framework | Vanilla JS | Fast load on every new tab |
+| Permissions | `storage`, `identity`, `host_permissions` for stikie.net | Minimal but needs auth + API access |
+
+### V2 Features
+
+- [ ] New tab override — clean, minimal page
+- [ ] **Quick capture input** — text field at center, type and hit Enter, note saves instantly
+- [ ] Rotating greeting messages:
+  - "Got an idea? Type it before it's gone."
+  - "Quick — what were you just thinking?"
+  - "Don't forget that thought. Capture it."
+  - "Your brain called. It said write this down."
+  - "One note now saves ten minutes later."
+- [ ] Recently captured notes shown below as small tiles (read-only, glanceable)
+- [ ] Notes sync to stikie.net in background
+- [ ] "Open in Stikie" link on each note tile → opens stikie.net
+- [ ] Stikie branding (subtle logo + link)
+- [ ] Offline support — saves locally, syncs when back online
+- [ ] Keyboard-first: tab opens → cursor already in input → type → Enter → done
+
+### What It Does NOT Have (Intentionally)
+
+- No clock
+- No full notes editor
+- No drag/reposition
+- No themes or customization
+- No canvas backgrounds
+- No font switching
+- No search
+- No archive
+
+### UX Flow
+
+```
+1. User opens new tab
+2. Clean page with greeting + centered text input
+3. User types a thought, hits Enter
+4. Note saves instantly (local + syncs to stikie.net)
+5. Note appears as small tile below the input
+6. User continues to address bar to search/navigate
+   Total time: 2-3 seconds
+```
+
+### File Structure
+
+```
+stikie-extension/
+├── manifest.json
+├── newtab.html
+├── newtab.js
+├── newtab.css
+├── sync.js              # API sync logic
+├── icons/
+│   ├── icon16.png
+│   ├── icon48.png
+│   └── icon128.png
+└── README.md
+```
+
+### Permissions Breakdown
+
+| Permission | What users see | Why needed |
+|------------|---------------|------------|
+| `storage` | No warning | Save notes locally |
+| `identity` | "Know your email address" | Google sign-in |
+| `host_permissions: stikie.net` | "Read and change your data on stikie.net" | API sync |
+
+### Gotchas
+
+- Only ONE extension can override new tab — conflicts with Momentum, etc.
+- `chrome.storage.local` is separate from stikie.net's localStorage — different origins
+- New tab must load < 100ms — no heavy frameworks
+- Sync failures should be silent — never block the capture flow
+- Auth token stored in `chrome.storage.local`, refreshed silently
+
+---
+
+## Publishing V2
+
+### Chrome Web Store Requirements
+
+- [ ] One-time $5 developer registration fee
+- [ ] Store listing assets:
+  - Extension icon: 128x128 PNG
+  - Screenshots: at least 1 (1280x800 or 640x400)
+  - Promotional tile (optional): 440x280
+  - Short description (132 chars max): "Capture thoughts instantly on every new tab. Syncs to stikie.net."
+  - Detailed description
+- [ ] Privacy policy URL (required)
+- [ ] Category: "Productivity"
+- [ ] Review: 1-3 business days
+
+### Post-Publish Checklist
+
+- [ ] Verify extension works after Chrome Web Store processing
+- [ ] Add Chrome Web Store badge/link to stikie.net
+- [ ] Update stikie.net README with extension link
+- [ ] Share on Reddit (r/chrome, r/productivity, r/webdev, r/SideProject)
+- [ ] Post on Product Hunt
+- [ ] Monitor reviews and ratings
+
+---
+
+## V3 — Customization & Theming
+
+### New Features
+
+- [ ] Theme switcher (Ivory, Pastel, Onyx, Ember — matching stikie.net)
+- [ ] Theme-specific note colors (6 colors per theme from stikie.net palette)
+- [ ] Font switcher (Geist/Inter, Patrick Hand, Caveat, JetBrains Mono)
+- [ ] Canvas background options (dot-grid, square-grid, plain, lined)
+- [ ] Small customization toolbar (bottom of page, similar to stikie.net)
+- [ ] Settings sync with stikie.net (same theme everywhere)
+
+### Theme Data (from stikie.net source)
+
+**Themes:**
+- Ivory — light, `#fafaf8`
+- Pastel — light, `#fefefe`
+- Onyx — dark, `#0a0a0a`
+- Ember — dark, `#1a1816`
+
+**Note Colors (per theme):** yellow, pink, blue, green, orange, purple
+
+**Fonts:** Inter, Patrick Hand, Caveat, JetBrains Mono (loaded via Google Fonts)
+
+---
+
+## V4 — Enhanced Experience
+
+### New Features
+
+- [ ] Note color picker on quick capture (small color dots next to input)
+- [ ] View more notes (expand tiles section)
+- [ ] Search/filter captured notes
+- [ ] Delete notes from extension
+- [ ] Edit notes inline (double-click a tile)
+- [ ] Quick capture popup (click extension icon → popup to capture without opening new tab)
+- [ ] Keyboard shortcuts (`N` to focus input, `Esc` to close)
+
+### New Permissions
+
+- `commands` — global keyboard shortcuts
+- `action` — extension icon popup
+
+---
+
+## V5 — Cross-Browser & Growth
+
+### Browser Support
+
+- [ ] Firefox Add-ons (free, similar manifest)
+- [ ] Microsoft Edge Add-ons (Chrome extensions work natively)
+- [ ] Safari Web Extensions (requires Xcode, $99/year Apple Developer)
+
+### Growth Features
+
+- [ ] "Share Stikie" referral program
+- [ ] Chrome side panel API (notes in sidebar while browsing)
+- [ ] Web clipper (highlight text on any page → save as note)
+
+---
+
+## Future Ideas (Backlog)
+
+- [ ] AI-powered note categorization (Anthropic API)
+- [ ] Reminders / due dates on notes
+- [ ] Integration with Notion, Todoist, Google Keep import
+- [ ] Desktop widget companion (Electron/Tauri)
+- [ ] Collaborative shared boards
+- [ ] Team workspaces
+
+---
+
+## Technical Notes
+
+### Performance Budget
+
+New tab pages must be instant:
+- First paint: < 100ms
+- Interactive: < 200ms
+- Capture-to-saved: < 50ms (local), sync in background
+- No heavy frameworks
+- Preload recent notes from `chrome.storage` on page load
+
+### Key Chrome APIs
+
+| API | Version | Purpose |
+|-----|---------|---------|
+| `chrome.storage.local` | V2+ | Persist notes locally (up to 10MB) |
+| `chrome.storage.sync` | V3+ | Sync settings across Chrome instances (up to 100KB) |
+| `chrome.identity` | V2+ | Google OAuth sign-in |
+| `chrome.commands` | V4+ | Keyboard shortcuts |
+| `chrome.sidePanel` | V5+ | Side panel UI (Chrome 114+) |
+| `chrome.action` | V4+ | Extension icon popup |
+
+### Revenue Model
+
+| Model | Description |
+|-------|-------------|
+| Funnel to stikie.net | Extension is free, drives sign-ups to stikie.net |
+| Free + Premium | Free capture, paid themes/unlimited sync/advanced features |
+
+---
+
+*Last updated: February 2025*
