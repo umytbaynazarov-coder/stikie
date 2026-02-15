@@ -1,6 +1,7 @@
 import { useNoteStore } from '../store/useNoteStore'
 import { getTheme } from '../utils/customization'
 import SettingsMenu from './SettingsMenu'
+import UserAvatar from './UserAvatar'
 
 export default function TopBar() {
   const themeId = useNoteStore((s) => s.customization.global.theme)
@@ -38,6 +39,7 @@ export default function TopBar() {
 
         {/* Settings */}
         <SettingsMenu />
+        <UserAvatar />
       </div>
     </div>
   )

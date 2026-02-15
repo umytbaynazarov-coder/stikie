@@ -14,6 +14,9 @@ import {
   calculateTimelineLayout,
   FONTS,
 } from '../utils/customization'
+import { getCurrentUserId } from '../lib/authRef'
+import { upsertNote, deleteNoteFromSupabase, batchUpsertNotes } from '../lib/supabaseSync'
+import { addToSyncQueue } from '../lib/syncQueue'
 
 const STORAGE_KEY = 'stikie-net-notes'
 const DARK_MODE_KEY = 'stikie-net-dark'
@@ -78,11 +81,66 @@ function loadCanvas(): { x: number; y: number; zoom: number } {
   }
 }
 
+// ── Sync helpers ──────────────────────────────────────────────
+
+const syncTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+
+/** Sync a single note to Supabase (debounced for content updates). */
+function debouncedSyncNote(noteId: string, delayMs: number) {
+  const userId = getCurrentUserId()
+  if (!userId) return
+  if (syncTimers[noteId]) clearTimeout(syncTimers[noteId])
+  syncTimers[noteId] = setTimeout(() => {
+    const note = useNoteStore.getState().notes.find((n) => n.id === noteId)
+    if (!note) return
+    upsertNote(note, userId).catch(() => {
+      addToSyncQueue({ type: 'upsert', noteId, data: note })
+    })
+  }, delayMs)
+}
+
+/** Sync a single note to Supabase immediately (fire-and-forget). */
+function syncNoteNow(noteId: string) {
+  const userId = getCurrentUserId()
+  if (!userId) return
+  const note = useNoteStore.getState().notes.find((n) => n.id === noteId)
+  if (!note) return
+  upsertNote(note, userId).catch(() => {
+    addToSyncQueue({ type: 'upsert', noteId, data: note })
+  })
+}
+
+/** Delete a note from Supabase (fire-and-forget). */
+function syncDeleteNote(noteId: string) {
+  const userId = getCurrentUserId()
+  if (!userId) return
+  deleteNoteFromSupabase(noteId).catch(() => {
+    addToSyncQueue({ type: 'delete', noteId })
+  })
+}
+
+/** Sync multiple notes to Supabase (fire-and-forget). */
+function syncBatchNotes(noteIds: string[]) {
+  const userId = getCurrentUserId()
+  if (!userId || noteIds.length === 0) return
+  const notes = useNoteStore.getState().notes.filter((n) => noteIds.includes(n.id))
+  if (notes.length === 0) return
+  batchUpsertNotes(notes, userId).catch(() => {
+    for (const note of notes) {
+      addToSyncQueue({ type: 'upsert', noteId: note.id, data: note })
+    }
+  })
+}
+
+// ── Store types ───────────────────────────────────────────────
+
 interface DeletedNote {
   note: Note
   index: number
   type: 'archived' | 'deleted'
 }
+
+export type SyncStatus = 'idle' | 'syncing' | 'error' | 'offline'
 
 interface NoteStore {
   notes: Note[]
@@ -98,6 +156,12 @@ interface NoteStore {
   archivePanelOpen: boolean
   pinLimitToast: boolean
   activeColorFilters: NoteColor[]
+
+  // Auth UI
+  authModalOpen: boolean
+
+  // Sync
+  syncStatus: SyncStatus
 
   // Customization
   customization: CustomizationStore
@@ -126,6 +190,9 @@ interface NoteStore {
   setArchivePanelOpen: (open: boolean) => void
   setPinLimitToast: (show: boolean) => void
   setActiveColorFilters: (colors: NoteColor[]) => void
+  setAuthModalOpen: (open: boolean) => void
+  setSyncStatus: (status: SyncStatus) => void
+  setNotesDirectly: (notes: Note[]) => void
   duplicateNote: (id: string) => string
   rearrangeNotes: () => void
 
@@ -170,6 +237,8 @@ export const useNoteStore = create<NoteStore>((set, get) => {
     archivePanelOpen: false,
     pinLimitToast: false,
     activeColorFilters: [],
+    authModalOpen: false,
+    syncStatus: 'idle',
     customization: initialCustomization,
 
     addNote: (x?: number, y?: number) => {
@@ -202,6 +271,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           rotations: { ...state.rotations, [id]: getRandomRotation() },
         }
       })
+      syncNoteNow(id)
       return id
     },
 
@@ -213,6 +283,12 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      // Debounce content updates, sync others immediately
+      if ('content' in updates) {
+        debouncedSyncNote(id, 500)
+      } else {
+        syncNoteNow(id)
+      }
     },
 
     deleteNote: (id) => {
@@ -231,6 +307,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           editingNoteId: state.editingNoteId === id ? null : state.editingNoteId,
         }
       })
+      syncNoteNow(id)
     },
 
     undoDelete: () => {
@@ -250,6 +327,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
             deletedStack: state.deletedStack.slice(0, -1),
           }
         })
+        syncNoteNow(last.note.id)
       } else {
         set((state) => {
           const newNotes = [...state.notes]
@@ -262,6 +340,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
             rotations: { ...state.rotations, [last.note.id]: getRandomRotation() },
           }
         })
+        syncNoteNow(last.note.id)
       }
       return last.note
     },
@@ -278,6 +357,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      syncNoteNow(id)
     },
 
     moveNote: (id, x, y) => {
@@ -288,6 +368,8 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      // Debounce move syncs to avoid flooding during drag
+      debouncedSyncNote(id, 500)
     },
 
     resizeNote: (id, width, height) => {
@@ -298,6 +380,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      debouncedSyncNote(id, 500)
     },
 
     setCanvas: (x, y) => {
@@ -331,6 +414,15 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         migrated.forEach((n) => { rotations[n.id] = getRandomRotation() })
         saveNotes(migrated)
         set({ notes: migrated, rotations })
+        // Sync all imported notes
+        const userId = getCurrentUserId()
+        if (userId) {
+          batchUpsertNotes(migrated, userId).catch(() => {
+            for (const note of migrated) {
+              addToSyncQueue({ type: 'upsert', noteId: note.id, data: note })
+            }
+          })
+        }
         return true
       } catch {
         return false
@@ -373,6 +465,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           return { notes: newNotes }
         })
       }
+      syncNoteNow(id)
     },
 
     archiveNote: (id) => {
@@ -391,6 +484,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           editingNoteId: state.editingNoteId === id ? null : state.editingNoteId,
         }
       })
+      syncNoteNow(id)
     },
 
     restoreNote: (id) => {
@@ -401,6 +495,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      syncNoteNow(id)
     },
 
     permanentlyDelete: (id) => {
@@ -409,19 +504,38 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      syncDeleteNote(id)
     },
 
     clearArchive: () => {
+      const archivedIds = get().notes.filter((n) => n.archived).map((n) => n.id)
       set((state) => {
         const newNotes = state.notes.filter((n) => !n.archived)
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      const userId = getCurrentUserId()
+      if (userId) {
+        for (const noteId of archivedIds) {
+          deleteNoteFromSupabase(noteId).catch(() => {
+            addToSyncQueue({ type: 'delete', noteId })
+          })
+        }
+      }
     },
 
     setArchivePanelOpen: (open) => set({ archivePanelOpen: open }),
     setPinLimitToast: (show) => set({ pinLimitToast: show }),
     setActiveColorFilters: (colors) => set({ activeColorFilters: colors }),
+    setAuthModalOpen: (open) => set({ authModalOpen: open }),
+    setSyncStatus: (status) => set({ syncStatus: status }),
+
+    setNotesDirectly: (notes) => {
+      saveNotes(notes)
+      const rotations: Record<string, number> = {}
+      notes.forEach((n) => { rotations[n.id] = getRandomRotation() })
+      set({ notes, rotations, selectedNoteId: null, editingNoteId: null, deletedStack: [] })
+    },
 
     duplicateNote: (id) => {
       const { notes, canvasX, canvasY, zoom } = get()
@@ -449,6 +563,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           rotations: { ...state.rotations, [newId]: getRandomRotation() },
         }
       })
+      syncNoteNow(newId)
       return newId
     },
 
@@ -470,6 +585,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
         saveNotes(newNotes)
         return { notes: newNotes }
       })
+      syncBatchNotes(Array.from(activeIds))
     },
 
     // ── Customization Actions ──────────────────────────────────────
@@ -545,6 +661,7 @@ export const useNoteStore = create<NoteStore>((set, get) => {
           saveCustomization(newCustomization)
           return { notes: newNotes, customization: newCustomization }
         })
+        syncBatchNotes(Array.from(activeIds))
       } else {
         set((state) => {
           const newCustomization: CustomizationStore = {

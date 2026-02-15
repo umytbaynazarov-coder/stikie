@@ -7,6 +7,7 @@ import PinLimitToast from './components/PinLimitToast'
 import SpeedBadge from './components/SpeedBadge'
 import InstallPrompt from './components/InstallPrompt'
 import ContextMenu from './components/ContextMenu'
+import AuthModal from './components/AuthModal'
 import MobileView from './components/MobileView'
 import CustomizationToolbar from './components/CustomizationToolbar'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -29,6 +30,7 @@ export default function App() {
       <SpeedBadge />
       <InstallPrompt />
       <ContextMenu />
+      <AuthModal />
       {!isMobile && <CustomizationToolbar />}
     </div>
   )

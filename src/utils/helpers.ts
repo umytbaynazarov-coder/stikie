@@ -38,7 +38,13 @@ export function migrateNote(raw: Record<string, unknown>): Note {
 
 
 export function generateId(): string {
-  return Math.random().toString(36).substring(2, 11) + Date.now().toString(36)
+  return crypto.randomUUID()
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function isUUID(id: string): boolean {
+  return UUID_RE.test(id)
 }
 
 export function getRandomRotation(): number {
