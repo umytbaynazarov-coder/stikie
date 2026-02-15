@@ -8,21 +8,60 @@
 
 > **The extension doesn't exist yet.** This phase builds the foundation that makes the extension valuable.
 
+### Tech Stack: Supabase (All-in-One)
+
+Supabase provides everything needed in a single platform — no custom backend server required.
+
+| Need | Supabase Solution | Details |
+|------|-------------------|---------|
+| Database | Postgres | Stores notes, user settings, customization preferences |
+| Auth | Supabase Auth | Google OAuth built-in, email/password, magic link — all pre-built |
+| API | Auto-generated REST API | Every table automatically gets CRUD endpoints — no Express, no custom routes |
+| Realtime | Supabase Realtime | Create a note in the extension → stikie.net updates live without refresh |
+| Security | Row Level Security (RLS) | Users can only read/write their own notes — enforced at database level |
+
+### Architecture
+
+```
+stikie.net  ──→  Supabase  ←──  Chrome Extension (V2)
+                 ├── Postgres (notes, users)
+                 ├── Auth (Google OAuth)
+                 ├── REST API (auto-generated)
+                 └── Realtime (live sync)
+```
+
 ### What Needs to Happen
 
-- [ ] Backend API for stikie.net (REST or similar)
-  - `GET /notes` — fetch all notes
-  - `POST /notes` — create a note
-  - `PUT /notes/:id` — update a note
-  - `DELETE /notes/:id` — delete a note
-- [ ] Auth system (Google OAuth, email/password, or magic link)
-- [ ] Database (migrate from localStorage-only to server-persisted)
-- [ ] Offline-first sync on stikie.net itself (local-first, syncs when online)
-- [ ] User accounts on stikie.net
+- [ ] Create Supabase project
+- [ ] Design `notes` table schema:
+  - `id` (uuid, primary key)
+  - `user_id` (uuid, references auth.users)
+  - `content` (text)
+  - `color` (text — yellow, pink, blue, green, orange, purple)
+  - `x`, `y` (float — position on canvas)
+  - `width`, `height` (int — note dimensions)
+  - `pinned` (boolean)
+  - `archived` (boolean)
+  - `archived_at` (timestamp, nullable)
+  - `created_at` (timestamp)
+  - `updated_at` (timestamp)
+- [ ] Set up Row Level Security (RLS) policies — users can only access their own notes
+- [ ] Set up Supabase Auth with Google OAuth provider
+- [ ] Migrate stikie.net from localStorage-only to Supabase:
+  - Keep localStorage as offline cache (local-first)
+  - Sync to Supabase when user is signed in and online
+  - Unsigned-in users keep current localStorage-only behavior (no breaking change)
+- [ ] Add sign-in/sign-up UI to stikie.net (Google OAuth button)
+- [ ] Optional: enable Supabase Realtime on `notes` table for live updates
+- [ ] One-time migration flow: when existing localStorage user signs in for the first time, upload their local notes to Supabase
 
 ### Why This Comes First
 
 Without this, the extension is a disconnected toy. With this, every note captured in the extension feeds into stikie.net — creating a real product loop.
+
+### Supabase Pricing Note
+
+Supabase free tier includes: 50K monthly active users, 500MB database, 5GB bandwidth, 1GB file storage. More than enough for launch and early growth. Paid plans start at $25/month if you outgrow it.
 
 ---
 
@@ -34,9 +73,9 @@ Without this, the extension is a disconnected toy. With this, every note capture
 
 | Decision | Choice | Why |
 |----------|--------|-----|
-| Architecture | Connected to stikie.net | Notes sync — this is the whole point |
-| Storage | `chrome.storage.local` + API sync | Offline-first, syncs when online |
-| Auth | Google OAuth via `chrome.identity` | One-click sign-in, no passwords |
+| Architecture | Connected to stikie.net via Supabase | Notes sync — this is the whole point |
+| Storage | `chrome.storage.local` + Supabase sync | Offline-first, syncs when online |
+| Auth | Google OAuth via Supabase Auth (or `chrome.identity`) | One-click sign-in, no passwords |
 | Manifest | V3 | Required for Chrome Web Store |
 | Framework | Vanilla JS | Fast load on every new tab |
 | Permissions | `storage`, `identity`, `host_permissions` for stikie.net | Minimal but needs auth + API access |
@@ -89,7 +128,7 @@ stikie-extension/
 ├── newtab.html
 ├── newtab.js
 ├── newtab.css
-├── sync.js              # API sync logic
+├── supabase.js           # Supabase client + sync logic
 ├── icons/
 │   ├── icon16.png
 │   ├── icon48.png
@@ -103,7 +142,7 @@ stikie-extension/
 |------------|---------------|------------|
 | `storage` | No warning | Save notes locally |
 | `identity` | "Know your email address" | Google sign-in |
-| `host_permissions: stikie.net` | "Read and change your data on stikie.net" | API sync |
+| `host_permissions: stikie.net, supabase.co` | "Read and change your data on stikie.net" | Supabase API sync |
 
 ### Gotchas
 
@@ -111,7 +150,8 @@ stikie-extension/
 - `chrome.storage.local` is separate from stikie.net's localStorage — different origins
 - New tab must load < 100ms — no heavy frameworks
 - Sync failures should be silent — never block the capture flow
-- Auth token stored in `chrome.storage.local`, refreshed silently
+- Supabase JS client is ~30KB gzipped — acceptable for new tab, but load it async after first paint
+- Auth token stored in `chrome.storage.local`, Supabase handles token refresh automatically
 
 ---
 
@@ -150,7 +190,17 @@ stikie-extension/
 - [ ] Font switcher (Geist/Inter, Patrick Hand, Caveat, JetBrains Mono)
 - [ ] Canvas background options (dot-grid, square-grid, plain, lined)
 - [ ] Small customization toolbar (bottom of page, similar to stikie.net)
-- [ ] Settings sync with stikie.net (same theme everywhere)
+- [ ] Settings sync via Supabase — user preferences stored in a `user_settings` table, so theme/font/canvas choices are the same on stikie.net and the extension
+
+### Supabase Addition
+
+- [ ] Create `user_settings` table:
+  - `user_id` (uuid, primary key, references auth.users)
+  - `theme` (text — ivory, pastel, onyx, ember)
+  - `canvas` (text — dot-grid, square-grid, plain, lined)
+  - `font` (text — geist, patrick-hand, caveat, jetbrains-mono)
+  - `layout` (text — freeform, grid, radial, timeline)
+  - `updated_at` (timestamp)
 
 ### Theme Data (from stikie.net source)
 
@@ -173,10 +223,14 @@ stikie-extension/
 - [ ] Note color picker on quick capture (small color dots next to input)
 - [ ] View more notes (expand tiles section)
 - [ ] Search/filter captured notes
-- [ ] Delete notes from extension
-- [ ] Edit notes inline (double-click a tile)
+- [ ] Delete notes from extension (syncs deletion to Supabase → reflects on stikie.net)
+- [ ] Edit notes inline (double-click a tile, changes sync to Supabase)
 - [ ] Quick capture popup (click extension icon → popup to capture without opening new tab)
 - [ ] Keyboard shortcuts (`N` to focus input, `Esc` to close)
+
+### Note
+
+All CRUD operations in the extension go through the same Supabase client — no new backend work needed. V1's infrastructure handles everything.
 
 ### New Permissions
 
@@ -189,47 +243,61 @@ stikie-extension/
 
 ### Browser Support
 
-- [ ] Firefox Add-ons (free, similar manifest)
-- [ ] Microsoft Edge Add-ons (Chrome extensions work natively)
+- [ ] Firefox Add-ons (free, similar manifest with minor tweaks)
+- [ ] Microsoft Edge Add-ons (Chrome extensions work natively, separate store)
 - [ ] Safari Web Extensions (requires Xcode, $99/year Apple Developer)
+
+Supabase JS client is browser-agnostic — the sync layer works identically across all browsers with zero changes. Only the extension manifest and browser-specific APIs (like `chrome.identity` vs Firefox equivalent) need adaptation.
 
 ### Growth Features
 
 - [ ] "Share Stikie" referral program
 - [ ] Chrome side panel API (notes in sidebar while browsing)
-- [ ] Web clipper (highlight text on any page → save as note)
+- [ ] Web clipper (highlight text on any page → save as note via Supabase)
 
 ---
 
 ## Future Ideas (Backlog)
 
 - [ ] AI-powered note categorization (Anthropic API)
-- [ ] Reminders / due dates on notes
+- [ ] Reminders / due dates on notes (Supabase Edge Functions for scheduled notifications)
 - [ ] Integration with Notion, Todoist, Google Keep import
-- [ ] Desktop widget companion (Electron/Tauri)
-- [ ] Collaborative shared boards
-- [ ] Team workspaces
+- [ ] Desktop widget companion (Electron/Tauri, same Supabase client)
+- [ ] Collaborative shared boards (Supabase Realtime — multiple users subscribing to the same board)
+- [ ] Team workspaces (Supabase RLS policies per team/org)
 
 ---
 
 ## Technical Notes
 
+### Supabase Setup
+
+| Resource | Free Tier Limit | Enough For |
+|----------|----------------|------------|
+| Database | 500MB | ~millions of notes |
+| Auth | 50K monthly active users | Early growth |
+| Bandwidth | 5GB | Plenty for text-only sync |
+| Realtime | 200 concurrent connections | Good until you're big |
+| Edge Functions | 500K invocations/month | Notifications, scheduled jobs |
+
+Supabase project URL and anon key are safe to include in client-side code — RLS policies enforce security at the database level.
+
 ### Performance Budget
 
 New tab pages must be instant:
-- First paint: < 100ms
+- First paint: < 100ms (render page before Supabase loads)
 - Interactive: < 200ms
-- Capture-to-saved: < 50ms (local), sync in background
-- No heavy frameworks
-- Preload recent notes from `chrome.storage` on page load
+- Capture-to-saved: < 50ms (local), Supabase sync in background
+- Load Supabase JS client async — never block first paint
+- Preload recent notes from `chrome.storage` on page load, then hydrate from Supabase
 
 ### Key Chrome APIs
 
 | API | Version | Purpose |
 |-----|---------|---------|
-| `chrome.storage.local` | V2+ | Persist notes locally (up to 10MB) |
-| `chrome.storage.sync` | V3+ | Sync settings across Chrome instances (up to 100KB) |
-| `chrome.identity` | V2+ | Google OAuth sign-in |
+| `chrome.storage.local` | V2+ | Offline note cache + auth tokens (up to 10MB) |
+| `chrome.storage.sync` | V3+ | Sync small settings across Chrome instances (up to 100KB) |
+| `chrome.identity` | V2+ | Google OAuth sign-in (can also use Supabase Auth directly) |
 | `chrome.commands` | V4+ | Keyboard shortcuts |
 | `chrome.sidePanel` | V5+ | Side panel UI (Chrome 114+) |
 | `chrome.action` | V4+ | Extension icon popup |
